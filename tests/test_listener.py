@@ -105,8 +105,8 @@ class StoreConfigTests(unittest.TestCase):
         self.assertEqual(st.upsert_signals(sig), 1)
         self.assertEqual(st.upsert_signals(sig), 0)
         row = st.list_signals()[0]
-        st.update_signal(row["id"], status="qualified", note="good")
-        self.assertEqual(st.list_signals(status="qualified")[0]["note"], "good")
+        st.update_signal(row["id"], status="pitched", note="good")
+        self.assertEqual(st.list_signals(status="pitched")[0]["note"], "good")
         with self.assertRaises(ValueError):
             st.update_signal(row["id"], status="bogus")
         self.assertIn("Organic traffic", st.export("csv"))

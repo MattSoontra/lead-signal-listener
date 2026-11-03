@@ -1,18 +1,20 @@
-"""SQLite storage with de-duplication on (source, external_id)."""
+"""SQLite storage with de-duplication on (source, external_id), plus a
+canonical-URL merge so the same post arriving via two sources stays one row."""
 import csv
 import io
 import json
 import sqlite3
 import threading
 import time
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-STATUSES = ("new", "qualified", "contacted", "replied", "ignored")
+STATUSES = ("new", "pitched", "talking", "won", "lost")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS signals (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   source TEXT NOT NULL, kind TEXT NOT NULL, external_id TEXT NOT NULL,
-  url TEXT, title TEXT, text TEXT, author TEXT, author_url TEXT, community TEXT,
+  url TEXT, url_key TEXT, title TEXT, text TEXT, author TEXT, author_url TEXT, community TEXT,
   created_utc INTEGER, engagement INTEGER DEFAULT 0, query TEXT,
   score INTEGER DEFAULT 0, persona TEXT, matched TEXT,
   status TEXT DEFAULT 'new', note TEXT DEFAULT '',
@@ -32,32 +34,103 @@ EXPORT_FIELDS = ["id", "score", "persona", "status", "source", "kind", "communit
                  "title", "text", "url", "query", "matched", "engagement", "created_utc", "note"]
 
 
+def canonical_url(url):
+    """Stable key for 'same post, different feed' URL matching, or None.
+
+    Conservative: lowercase scheme/host, drop the fragment and utm_* tracking
+    params, ignore a trailing slash. Query params that identify the post stay.
+    """
+    if not url:
+        return None
+    try:
+        parts = urlsplit(url.strip())
+    except ValueError:
+        return None
+    if not parts.netloc:
+        return None
+    path = parts.path or "/"
+    if path != "/" and path.endswith("/"):
+        path = path.rstrip("/")
+    query = urlencode([(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
+                       if not k.lower().startswith("utm_")])
+    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, query, ""))
+
+
 class Store:
     def __init__(self, path):
         self.lock = threading.Lock()
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        self._ensure_url_key()
         self.db.commit()
 
+    def _ensure_url_key(self):
+        """Add + backfill url_key on databases created before it existed."""
+        cols = [r[1] for r in self.db.execute("PRAGMA table_info(signals)")]
+        if "url_key" not in cols:
+            self.db.execute("ALTER TABLE signals ADD COLUMN url_key TEXT")
+        rows = self.db.execute("SELECT id, url FROM signals WHERE url IS NOT NULL AND url_key IS NULL").fetchall()
+        for r in rows:
+            self.db.execute("UPDATE signals SET url_key = ? WHERE id = ?", (canonical_url(r["url"]), r["id"]))
+        self.db.execute("CREATE INDEX IF NOT EXISTS idx_signals_url_key ON signals(url_key)")
+
     def upsert_signals(self, signals):
-        """Insert unseen signals; returns number of new rows."""
+        """Insert unseen signals; returns number of new rows.
+
+        A signal whose canonical URL already exists merges into that row
+        (see _merge) instead of duplicating it under another source.
+        """
         new = 0
         now = int(time.time())
         with self.lock:
             for s in signals:
+                url_key = canonical_url(s.get("url"))
+                row = None
+                if url_key:
+                    row = self.db.execute("SELECT * FROM signals WHERE url_key = ?", (url_key,)).fetchone()
+                if row is not None:
+                    self._merge(row, s)
+                    continue
                 cur = self.db.execute(
                     """INSERT OR IGNORE INTO signals
-                       (source, kind, external_id, url, title, text, author, author_url, community,
+                       (source, kind, external_id, url, url_key, title, text, author, author_url, community,
                         created_utc, engagement, query, score, persona, matched, first_seen)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (s["source"], s["kind"], s["external_id"], s.get("url"), s.get("title"), s.get("text"),
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (s["source"], s["kind"], s["external_id"], s.get("url"), url_key, s.get("title"), s.get("text"),
                      s.get("author"), s.get("author_url"), s.get("community"), s.get("created_utc"),
                      s.get("engagement", 0), s.get("query"), s.get("score", 0), s.get("persona"),
                      json.dumps(s.get("matched", []), ensure_ascii=False), now))
                 new += cur.rowcount
             self.db.commit()
         return new
+
+    def _merge(self, row, s):
+        """Fold an incoming duplicate into an existing row: fill gaps, keep the
+        richer text/score, never touch status or note (a human may have
+        already worked the lead)."""
+        upd = {}
+        for col in ("title", "author", "author_url", "community", "query", "persona"):
+            if not row[col] and s.get(col):
+                upd[col] = s[col]
+        if s.get("created_utc") and not row["created_utc"]:
+            upd["created_utc"] = s["created_utc"]
+        if s.get("text") and len(s["text"]) > len(row["text"] or ""):
+            upd["text"] = s["text"]
+        if (s.get("engagement") or 0) > (row["engagement"] or 0):
+            upd["engagement"] = s["engagement"]
+        if (s.get("score") or 0) > (row["score"] or 0):
+            upd["score"] = s["score"]
+        try:
+            matched = json.loads(row["matched"] or "[]")
+        except json.JSONDecodeError:
+            matched = []
+        extra = [m for m in (s.get("matched") or []) if m not in matched]
+        if extra:
+            upd["matched"] = json.dumps(matched + extra, ensure_ascii=False)
+        if upd:
+            cols = ", ".join(f"{c} = ?" for c in upd)
+            self.db.execute(f"UPDATE signals SET {cols} WHERE id = ?", (*upd.values(), row["id"]))
 
     @staticmethod
     def _where(status=None, source=None, persona=None, min_score=0, q=None, since=None):

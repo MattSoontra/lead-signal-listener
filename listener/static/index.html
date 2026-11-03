@@ -188,7 +188,7 @@
   .board button b { display:block; font:400 24px/1.1 var(--display); }
   .board button span { display:flex; align-items:center; gap:6px; font:12px var(--mono); color:var(--muted); margin-top:4px; }
   .board button span::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--c, var(--muted2)); }
-  .board .b-new { --c:#1a1a1a; } .board .b-qualified { --c:var(--green); } .board .b-contacted { --c:#0a66c2; } .board .b-replied { --c:#e1306c; } .board .b-ignored { --c:#c2c2c2; }
+  .board .b-new { --c:#1a1a1a; } .board .b-pitched { --c:#0a66c2; } .board .b-talking { --c:#e1306c; } .board .b-won { --c:var(--green); } .board .b-lost { --c:#c2c2c2; }
   .board button[aria-pressed=true] { background:var(--ink); border-color:var(--ink); color:#fff; }
   .board button[aria-pressed=true] span { color:#b5b5b5; }
   .board button[aria-pressed=true].b-new span::before { background:#fff; }
@@ -389,7 +389,7 @@ const I18N = {
     focus_hint: "One sentence describing the people or companies you want to find. It's shown on the Leads page. Leave it empty to describe your listeners automatically.",
     focus_ph: "e.g. B2B SaaS founders whose organic traffic dropped because of AI search",
     export_csv: "Export CSV", export_json: "Export JSON", run_now: "Run now", last_log: "last run log ▾", no_log: "No runs yet",
-    all: "All", st_new: "new · to review", st_qualified: "qualified", st_contacted: "contacted", st_replied: "replied", st_ignored: "ignored",
+    all: "All", st_new: "new · to review", st_pitched: "pitched", st_talking: "talking", st_won: "won", st_lost: "lost",
     search_ph: "Title / text / author, press Enter", refresh: "Refresh",
     sources_intro: "One keyword per line; each keyword makes one API call per run. Prices come from the Treg catalog — actual charges apply.",
     save_config: "Save", rules_title: "Scoring rules",
@@ -413,9 +413,9 @@ const I18N = {
     count: (n, t) => `${n} of ${t} signals`, more: "Load more",
     lb_scope: "range", scope_all: "All leads", scope_last: "New in last run",
     lb_sort: "sort", sort_score: "Score", sort_recent: "Newest found",
-    s_last: "new last run", new_badge: "NEW", seen: x => `found ${x}`, expand: "Click to expand", note_ph: "Note", note_add: "+ Add note", note_title: "Note", note_save: "Save", note_cancel: "Cancel", note_hint: "Ctrl+Enter to save · Esc to close", b_all: "All", s_ignored: "Ignored",
+    s_last: "new last run", new_badge: "NEW", seen: x => `found ${x}`, expand: "Click to expand", note_ph: "Note", note_add: "+ Add note", note_title: "Note", note_save: "Save", note_cancel: "Cancel", note_hint: "Ctrl+Enter to save · Esc to close", b_all: "All", s_lost: "Lost",
     empty_t: "No signals yet", empty_d: "Add your Treg token in Settings, then click Run now.",
-    s_new: "To review", s_total: "Total leads", s_qualified: "Qualified", s_contacted: "Contacted", s_replied: "Replied", s_spent: "Spent (30d)", s_calls: "Treg calls",
+    s_new: "To review", s_total: "Total leads", s_pitched: "Pitched", s_talking: "Talking", s_won: "Won", s_spent: "Spent (30d)", s_calls: "Treg calls",
     running: "running…", next_run: "next run · ",
     rss_desc: "Free. Google Alerts, subreddit feeds (reddit.com/r/NAME/new/.rss), hnrss.org keyword feeds, blogs, job boards…",
     rss_feeds: "feed urls · one per line", rss_keywords: "keyword filter · optional, match any",
@@ -448,7 +448,7 @@ const I18N = {
     focus_hint: "用一句话描述你要找的人或公司，会显示在线索页顶部。留空则根据启用的数据源和关键词自动生成。",
     focus_ph: "例如：自然流量因 AI 搜索下滑的 B2B SaaS 创始人",
     export_csv: "导出 CSV", export_json: "导出 JSON", run_now: "立即运行", last_log: "最近一次运行日志 ▾", no_log: "尚未运行",
-    all: "全部", st_new: "new · 待处理", st_qualified: "qualified · 合格", st_contacted: "contacted · 已联系", st_replied: "replied · 已回复", st_ignored: "ignored · 忽略",
+    all: "全部", st_new: "new · 待处理", st_pitched: "pitched · 已发送", st_talking: "talking · 沟通中", st_won: "won · 已成交", st_lost: "lost · 已流失",
     search_ph: "标题 / 正文 / 作者，回车搜索", refresh: "刷新",
     sources_intro: "每行一个关键词，每个关键词每次运行调用一次接口。价格取自 Treg 目录，以实际扣费为准。",
     save_config: "保存配置", rules_title: "打分规则",
@@ -472,9 +472,9 @@ const I18N = {
     count: (n, t) => `显示 ${n} / 共 ${t} 条`, more: "加载更多",
     lb_scope: "范围", scope_all: "全部线索", scope_last: "只看本次新增",
     lb_sort: "排序", sort_score: "按分数", sort_recent: "最新入库",
-    s_last: "本次新增", new_badge: "新", seen: x => `入库 ${x}`, expand: "点击展开", note_ph: "备注", note_add: "+ 添加备注", note_title: "备注", note_save: "保存", note_cancel: "取消", note_hint: "Ctrl+Enter 保存 · Esc 关闭", b_all: "全部", s_ignored: "已忽略",
+    s_last: "本次新增", new_badge: "新", seen: x => `入库 ${x}`, expand: "点击展开", note_ph: "备注", note_add: "+ 添加备注", note_title: "备注", note_save: "保存", note_cancel: "取消", note_hint: "Ctrl+Enter 保存 · Esc 关闭", b_all: "全部", s_lost: "已流失",
     empty_t: "暂无线索", empty_d: "先在「设置」里录入 Treg token，再点「立即运行」。",
-    s_new: "待处理", s_total: "线索总数", s_qualified: "合格", s_contacted: "已联系", s_replied: "已回复", s_spent: "近 30 天花费", s_calls: "Treg 调用",
+    s_new: "待处理", s_total: "线索总数", s_pitched: "已发送", s_talking: "沟通中", s_won: "已成交", s_spent: "近 30 天花费", s_calls: "Treg 调用",
     running: "运行中…", next_run: "下次运行 · ",
     rss_desc: "免费。可接 Google Alerts、subreddit 订阅（reddit.com/r/名称/new/.rss）、hnrss.org 关键词订阅、博客、招聘板等。",
     rss_feeds: "订阅地址 · 每行一个", rss_keywords: "关键词过滤 · 可选，命中任意一个即保留",
@@ -742,7 +742,7 @@ function rowHtml(r) {
       </div>
       <div class="side">
         <div class="who">${r.author_url ? `<a href="${safeUrl(r.author_url)}" target="_blank" rel="noopener noreferrer">${esc(r.author || "—")}</a>` : esc(r.author || "—")}</div>
-        <select data-id="${r.id}" class="st">${["new","qualified","contacted","replied","ignored"].map(s => `<option value="${s}" ${s===r.status?"selected":""}>${T("st_" + s)}</option>`).join("")}</select>
+        <select data-id="${r.id}" class="st">${["new","pitched","talking","won","lost"].map(s => `<option value="${s}" ${s===r.status?"selected":""}>${T("st_" + s)}</option>`).join("")}</select>
         <button class="notebtn${r.note ? " has" : ""}" data-id="${r.id}" title="${esc(r.note || T("note_add"))}">${r.note ? "✎ " + esc(r.note) : T("note_add")}</button>
       </div></div>`;
 }
@@ -787,7 +787,7 @@ document.addEventListener("keydown", e => {
 });
 
 // ---- status board: counts follow every filter except status; click to switch the list
-const BOARD = [["", "b_all"], ["new", "s_new"], ["qualified", "s_qualified"], ["contacted", "s_contacted"], ["replied", "s_replied"], ["ignored", "s_ignored"]];
+const BOARD = [["", "b_all"], ["new", "s_new"], ["pitched", "s_pitched"], ["talking", "s_talking"], ["won", "s_won"], ["lost", "s_lost"]];
 async function loadCounts() {
   const p = new URLSearchParams(filterQS()); p.delete("status");
   COUNTS = await api("/api/signals/counts?" + p.toString());

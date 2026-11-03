@@ -1,0 +1,12 @@
+[Unit]
+Description=Lead Signal Listener (MattSoontra fork) — dashboard + API
+After=network.target
+
+[Service]
+WorkingDirectory=/home/hatch/workspace/lead-signal-listener
+ExecStart=/usr/bin/python3 /home/hatch/workspace/lead-signal-listener/app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
